@@ -1,6 +1,6 @@
 ---
 name: cn-policy-change-collector
-description: collect and normalize chinese government policy changes that materially affect enterprise handling, compliance, subsidies, approvals, filing, customs, tax, environment, talent, schooling, and market regulation. use when the user asks to track 政策变更、政策修改、政策更新、通知、办法、细则、补贴、申报、审批、备案、税惠、报关、环评、人才、就学, or requests a normalized table with 分类、政策文件编号、摘要（变化和实施范围）、发布日期、部门、说明. work inline in the current conversation instead of creating jobs.
+description: collect and structure chinese government policy changes into a normalized table for the current chat. use when the user asks to track 政策变更、政策修改、政策更新、通知、办法、细则、补贴、申报、审批、备案、税惠、报关、环评、人才、就学 or requests a table with 分类、政策文件编号、摘要（变化和实施范围）、发布日期、部门、说明、原文链接. always work inline in the current conversation. never create jobs, projects, routines, or background tasks.
 ---
 
 # 中国政府部门政策变更收集
@@ -12,9 +12,10 @@ description: collect and normalize chinese government policy changes that materi
 ## 执行约束
 
 - 在**当前对话**内直接完成检索、核实和表格输出。
-- **不要创建 job、task、project 或后台任务**，除非用户明确要求做长期监测。
+- **禁止创建 job、task、project、routine 或后台任务**，除非用户明确要求做长期监测。
+- **不要调用 create_job**。
 - **不要调用 memory_tree、memory_search 或其他工作区记忆工具**，除非用户明确要求查询已保存的内部记忆。
-- 若可用，优先使用网页检索；若网页检索工具不可用，则明确说明限制，并继续基于可用网页/站点检索能力完成任务。
+- 若网页检索工具可用，优先用网页检索；若不可用，明确说明限制后继续基于可访问站点完成任务。
 - 不要因为缺少个别边界条件而停在追问上；先按默认值给出首版结果，再说明缺口。
 
 ## 默认工作流
@@ -44,7 +45,7 @@ description: collect and normalize chinese government policy changes that materi
 - 单纯新闻宣传、领导调研、会议报道
 - 不产生办理口径变化的转载文章
 - 与用户事项无关的政策解读
-- 只有政策标题但无法核实原文的线索
+- 只有二手转载、无法核实原文的线索
 
 ### 3. 检索顺序
 
@@ -52,7 +53,7 @@ description: collect and normalize chinese government policy changes that materi
 2. 新闻、公众号、咨询文章只能作为线索，必须回到官方原文核实后再入表。
 3. 若检索到“修订版/新通知”，优先寻找旧版、被替代文件或上位文件，用于判断变化点。
 4. 若找不到直接对应旧文，不要编造对比，摘要里写成“新增/明确/优化”。
-5. 若官方原文无法确认发布日期、文号或适用范围，不要猜测；在“说明”里明确缺失项。
+5. 若官方原文无法确认发布日期、文号或适用范围，不要猜测；在“说明”中明确缺失项。
 
 ## 部门与事项映射
 
@@ -100,26 +101,34 @@ description: collect and normalize chinese government policy changes that materi
 
 ## 输出规则
 
-默认输出为 markdown 表格，列名必须与用户要求完全一致：
+默认输出为 markdown 表格，列名默认使用以下 7 列：
+
+| 分类 | 政策文件编号 | 摘要（变化和实施范围） | 发布日期 | 部门 | 说明 | 原文链接 |
+
+如果用户明确要求必须保留原 6 列，则仍使用：
 
 | 分类 | 政策文件编号 | 摘要（变化和实施范围） | 发布日期 | 部门 | 说明 |
+
+此时必须把官方原文链接放入“说明”列中，格式为：`原文：<url>`。
 
 ### 每列填写规则
 
 - 分类：写具体事项/主题，不要只写部门名。优先使用用户给出的对接事宜名称。
-- 政策文件编号：写正式文号、公告号、令号或通知编号；若原文未列明，写 `无文号（原网页未列明）`。
+- 政策文件编号：**必须写真实文号、公告号、令号或通知编号。严禁使用占位符、推测写法或示例编号**，包括但不限于：`X号`、`xx号`、`〔2024〕xx号`、`[示例文号]`、`待补`。若原文未列明，写 `无文号（原网页未列明）`。
 - 摘要（变化和实施范围）：1 到 2 句；必须同时覆盖变化点和适用范围。
 - 发布日期：统一写 `YYYY-MM-DD`；优先用官方发布日期，不要用媒体转载日期。
 - 部门：写正式发文机关；联合发文可写多个部门，用 `、` 连接。
 - 说明：尽量包含以下信息中的关键项：原文标题、适用地区、生效/执行时间、是否替代/修订旧文；若没有旧文就写“未检索到直接对应旧文”。
+- 原文链接：必须填写**可直接打开的官方原文链接**，优先使用 `gov.cn`、部委官网、省市政府官网、局委办官网的正式页面链接。
 
 ### 输出质量要求
 
 - 默认按发布日期倒序。
 - 同一文件不要重复入表。
 - 没有核实到官方原文的内容，不要入表。
-- 不要虚构文号、日期、旧文关系或实施范围。
+- 不要虚构文号、日期、旧文关系、实施范围或链接。
 - 若结果覆盖面不足，先坦率说明缺口，再补“还需指定省/市或更长时间范围”。
+- 只要表格中出现一条记录，就必须给出对应的官方原文链接。
 
 ## 地域处理规则
 
@@ -155,5 +164,6 @@ description: collect and normalize chinese government policy changes that materi
 - 先判断有没有变化，再决定是否入表。
 - 先找官方原文，再写摘要。
 - 先写变化点，再写实施范围。
-- 不要为了组织流程而新建 job 或读取空的 workspace path。
-- 如果用户要求 Excel/CSV 友好格式，可在相同六列的前提下输出制表符分隔文本。
+- 先确认真实文号，再写“政策文件编号”。
+- 如果拿不到真实文号，就写 `无文号（原网页未列明）`，不要自造编号。
+- 如果用户要求 Excel/CSV 友好格式，可在相同列的前提下输出制表符分隔文本。
